@@ -1,0 +1,123 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "proxiserve-server"
+version = "0.1.0"
+description = "Production-grade backend for ProxiServe."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "alembic>=1.16.0",
+  "argon2-cffi>=25.1.0",
+  "arq>=0.26.3",
+  "asyncpg>=0.30.0",
+  "cryptography>=45.0.0",
+  "email-validator>=2.2.0",
+  "fastapi>=0.116.0",
+  "greenlet>=3.2.0",
+  "httpx>=0.28.0",
+  "opentelemetry-api>=1.36.0",
+  "opentelemetry-exporter-otlp>=1.36.0",
+  "opentelemetry-instrumentation-fastapi>=0.57b0",
+  "opentelemetry-sdk>=1.36.0",
+  "phonenumbers>=9.0.0",
+  "prometheus-client>=0.22.0",
+  "pydantic>=2.11.0",
+  "pydantic-settings>=2.10.0",
+  "PyJWT>=2.10.0",
+  "pyotp>=2.9.0",
+  "redis>=5.2.0,<6.0.0",
+  "sqlalchemy>=2.0.41",
+  "structlog>=25.4.0",
+  "uvicorn[standard]>=0.35.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "asgi-lifespan>=2.1.0",
+  "anyio>=4.9.0",
+  "import-linter>=2.3",
+  "mypy>=1.16.0",
+  "pytest>=8.4.0",
+  "pytest-asyncio>=1.0.0",
+  "pytest-cov>=6.2.0",
+  "ruff>=0.12.0",
+  "testcontainers[postgres,redis]>=4.12.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "B",
+  "UP",
+  "ASYNC",
+  "N",
+]
+ignore = [
+  "B008",
+  "E501",
+  "N815",
+  "UP037",
+  "UP046",
+  "UP047",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+  "arq.*",
+  "phonenumbers.*",
+  "testcontainers.*",
+]
+ignore_missing_imports = true
+
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "auth module boundaries"
+type = "forbidden"
+source_modules = [
+  "app.modules.auth",
+]
+forbidden_modules = [
+  "app.modules.applications.repository",
+  "app.modules.applications.models",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+skip_empty = true
+show_missing = true
