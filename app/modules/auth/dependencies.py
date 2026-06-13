@@ -18,7 +18,7 @@ from app.core.dependencies import (
     get_redis,
 )
 from app.core.events import EventBus
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.core.jobs import JobQueueManager
 from app.core.security import decode_token
 from app.modules.auth.constants import ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME
@@ -71,3 +71,32 @@ def get_access_payload_optional(
         return decode_token(token=access_token, secret=settings.jwt_access_secret, settings=settings)
     except jwt.PyJWTError:
         return None
+
+
+def require_role(*allowed_roles: str) -> Any:
+    """Dependency factory that enforces the caller has one of the allowed roles."""
+
+    async def check(payload: dict[str, Any] = Depends(require_access_payload)) -> dict[str, Any]:
+        if payload.get("role") not in allowed_roles:
+            raise ForbiddenError()
+        return payload
+
+    return Depends(check)
+
+
+def require_email_verified() -> Any:
+    """Dependency that enforces the caller has verified their email."""
+
+    async def check(payload: dict[str, Any] = Depends(require_access_payload)) -> dict[str, Any]:
+        if not payload.get("isEmailVerified"):
+            raise ForbiddenError(message="Email verification required.")
+        return payload
+
+    return Depends(check)
+
+
+# Convenience aliases — use these in routers instead of inline require_role() calls.
+REQUIRE_ADMIN = require_role("staff:admin")
+REQUIRE_AGENT = require_role("staff:agent")
+REQUIRE_AGENT_OR_ADMIN = require_role("staff:agent", "staff:admin")
+REQUIRE_CLIENT = require_role("client")
