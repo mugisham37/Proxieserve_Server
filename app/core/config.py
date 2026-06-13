@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     postgres_db: str = Field(default="proxiserve", alias="POSTGRES_DB")
     postgres_user: str = Field(default="proxiserve", alias="POSTGRES_USER")
     postgres_password: str = Field(default="proxiserve", alias="POSTGRES_PASSWORD")
+    postgres_ssl: bool = Field(default=False, alias="POSTGRES_SSL")
 
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
 

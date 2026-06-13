@@ -39,12 +39,14 @@ class DatabaseManager:
         if self.engine is not None:
             return
 
+        connect_args: dict[str, object] = {"ssl": "require"} if settings.postgres_ssl else {}
         self.engine = create_async_engine(
             settings.database_url,
             echo=settings.app_debug,
             pool_pre_ping=True,
             pool_size=10,
             max_overflow=20,
+            connect_args=connect_args,
         )
         self.session_factory = async_sessionmaker(
             self.engine,
