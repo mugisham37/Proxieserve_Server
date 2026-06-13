@@ -23,6 +23,7 @@ class User(Base):
     phone_e164: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str] = mapped_column(String(32), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     language: Mapped[str] = mapped_column(String(8), nullable=False, default="en")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
