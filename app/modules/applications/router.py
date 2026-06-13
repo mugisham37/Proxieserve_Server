@@ -12,6 +12,7 @@ from app.modules.applications.schemas import (
     ApplicationLookupData,
 )
 from app.modules.applications.service import ApplicationsService
+from app.modules.auth.dependencies import REQUIRE_CLIENT
 
 router = APIRouter(prefix="/api/applications", tags=["applications"])
 service = ApplicationsService()
@@ -38,7 +39,7 @@ async def lookup_application(code: str) -> ApiResponse[ApplicationLookupData]:
 @router.post(
     "/claim",
     response_model=ApiResponse[ApplicationClaimData],
-    dependencies=[Depends(rate_limit("applications-claim", 10, 60))],
+    dependencies=[Depends(rate_limit("applications-claim", 10, 60)), REQUIRE_CLIENT],
 )
 async def claim_application(payload: ApplicationClaimRequest) -> ApiResponse[ApplicationClaimData]:
     await service.claim(code=payload.code, phone=payload.phone)
