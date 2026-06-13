@@ -23,9 +23,10 @@ from app.core.exceptions import (
 )
 from app.core.jobs import JobQueueManager
 from app.core.security import (
+    async_hash_password,
+    async_verify_password,
     generate_id,
     generate_opaque_token,
-    hash_password,
     hash_token,
     mask_email,
     mask_phone,
@@ -106,7 +107,7 @@ class AuthService:
             name=request.name,
             email=email,
             phone_e164=phone,
-            password_hash=hash_password(request.password),
+            password_hash=await async_hash_password(request.password),
             role="client",
             is_email_verified=False,
             language=request.language,
@@ -165,7 +166,7 @@ class AuthService:
             identifier_type=request.identifierType,
             identifier=normalized_identifier,
         )
-        if user is None or not verify_password(request.password, user.password_hash):
+        if user is None or not await async_verify_password(request.password, user.password_hash):
             await self._record_login_failure(identifier=normalized_identifier, ip_address=ip_address)
             raise InvalidCredentialsError()
 
@@ -237,7 +238,15 @@ class AuthService:
         self,
         request: ForgotPasswordRequest,
     ) -> ServiceResult[ForgotPasswordData]:
-        normalized_identifier = self._normalize_identifier(request.identifierType, request.identifier)
+        try:
+            normalized_identifier = self._normalize_identifier(request.identifierType, request.identifier)
+        except Exception:
+            # Invalid format — return masked stub without revealing whether it exists
+            return ServiceResult(
+                payload=ForgotPasswordData(
+                    maskedEmail=self._masked_identifier_value(request.identifierType, request.identifier)
+                )
+            )
         user = await self.repository.get_user_by_identifier(
             identifier_type=request.identifierType,
             identifier=normalized_identifier,
@@ -273,7 +282,7 @@ class AuthService:
         user = await self.repository.get_user_by_id(reset_token.user_id)
         if user is None:
             raise ResetExpiredError()
-        user.password_hash = hash_password(request.password)
+        user.password_hash = await async_hash_password(request.password)
         await self.repository.mark_reset_token_used(reset_token.id)
         await self.repository.delete_refresh_tokens_for_user(user.user_id)
         await self.session.commit()
@@ -296,12 +305,9 @@ class AuthService:
     ) -> ServiceResult[StaffLoginData]:
         user = await self.repository.get_user_by_email(str(request.email).lower())
         expected_role = "staff:admin" if request.role == "admin" else "staff:agent"
-        if (
-            user is None
-            or user.role != expected_role
-            or not user.is_active
-            or not verify_password(request.password, user.password_hash)
-        ):
+        if user is None or user.role != expected_role or not user.is_active:
+            raise InvalidCredentialsError()
+        if not await async_verify_password(request.password, user.password_hash):
             raise InvalidCredentialsError()
 
         staff_profile = await self.repository.get_staff_profile(user.user_id)

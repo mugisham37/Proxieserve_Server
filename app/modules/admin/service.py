@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.core.exceptions import AgentNotFoundError, EmailAlreadyInUseError
 from app.core.jobs import JobQueueManager
-from app.core.security import generate_id, hash_password
+from app.core.security import async_hash_password, generate_id
 from app.modules.admin.schemas import (
     AgentListItem,
     AgentListResponse,
@@ -52,7 +52,7 @@ class AdminService:
             name=request.name,
             email=email,
             phone_e164=None,
-            password_hash=hash_password(temp_password),
+            password_hash=await async_hash_password(temp_password),
             role="staff:agent",
             is_active=True,
             is_email_verified=True,
@@ -158,7 +158,7 @@ class AdminService:
 
         if request.reset_password:
             temp_password = secrets.token_urlsafe(12)
-            user.password_hash = hash_password(temp_password)
+            user.password_hash = await async_hash_password(temp_password)
             updated.append("password")
             try:
                 await self.job_queue.enqueue(

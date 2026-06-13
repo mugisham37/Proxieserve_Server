@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import secrets
 from base64 import urlsafe_b64encode
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from typing import Any
 
 import jwt
@@ -35,9 +37,22 @@ def hash_password(password: str) -> str:
     return password_hasher.hash(password)
 
 
+async def async_hash_password(password: str) -> str:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, password_hasher.hash, password)
+
+
 def verify_password(password: str, password_hash: str) -> bool:
     try:
         return password_hasher.verify(password_hash, password)
+    except Exception:
+        return False
+
+
+async def async_verify_password(password: str, password_hash: str) -> bool:
+    loop = asyncio.get_running_loop()
+    try:
+        return await loop.run_in_executor(None, partial(password_hasher.verify, password_hash, password))
     except Exception:
         return False
 

@@ -36,7 +36,9 @@ _ADMIN_PW_HASH = (
 
 async def _seed_admin() -> None:
     """Ensure the permanent admin account exists in the database (idempotent)."""
-    async with db_manager.session() as session:
+    if db_manager.session_factory is None:
+        raise RuntimeError("DatabaseManager is not configured")
+    async with db_manager.session_factory() as session:
         existing = await session.scalar(select(User).where(User.role == "staff:admin").limit(1))
         if existing is not None:
             _logger.info("Admin account already exists — skipping seed.")
