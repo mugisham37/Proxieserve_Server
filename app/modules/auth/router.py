@@ -165,7 +165,7 @@ async def staff_two_factor(
     return success_response(message="Staff session established.", data=result.payload)
 
 
-@router.get("/session", response_model=ApiResponse[SessionData])
+@router.get("/session", response_model=ApiResponse[SessionData], dependencies=[Depends(rate_limit("auth-session", 60, 60))])
 async def get_session(
     response: Response,
     access_payload: dict[str, Any] | None = Depends(get_access_payload_optional),

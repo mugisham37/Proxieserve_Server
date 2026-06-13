@@ -125,7 +125,7 @@ class AuthService:
 
         bundle = await self._issue_session_for_user(user, is_staff=False)
         challenge_id = self._client_challenge_id(user.user_id)
-        await self.otp_service.create_challenge(
+        challenge = await self.otp_service.create_challenge(
             challenge_id=challenge_id,
             user_id=user.user_id,
             purpose="client-verify",
@@ -134,7 +134,7 @@ class AuthService:
         await self._enqueue_otp_notification(
             email=email,
             phone=phone,
-            code_preview="verification code",
+            code=challenge.code,
         )
 
         await self.session.commit()
@@ -178,7 +178,7 @@ class AuthService:
         )
 
         bundle = await self._issue_session_for_user(user, is_staff=False)
-        await self.otp_service.create_challenge(
+        challenge = await self.otp_service.create_challenge(
             challenge_id=self._client_challenge_id(user.user_id),
             user_id=user.user_id,
             purpose="client-verify",
@@ -187,7 +187,7 @@ class AuthService:
         await self._enqueue_otp_notification(
             email=user.email,
             phone=user.phone_e164,
-            code_preview="verification code",
+            code=challenge.code,
         )
         await self.session.commit()
 
@@ -220,7 +220,7 @@ class AuthService:
         user = await self.repository.get_user_by_id(current_user_id)
         if user is None:
             raise UnauthorizedError()
-        await self.otp_service.resend_challenge(
+        challenge = await self.otp_service.resend_challenge(
             challenge_id=self._client_challenge_id(current_user_id),
             user_id=current_user_id,
             purpose="client-verify",
@@ -229,7 +229,7 @@ class AuthService:
         await self._enqueue_otp_notification(
             email=user.email,
             phone=user.phone_e164,
-            code_preview="verification code",
+            code=challenge.code,
         )
         return ServiceResult(payload=VerifyOtpData())
 
@@ -301,7 +301,7 @@ class AuthService:
 
         staff_profile = await self.repository.get_staff_profile(user.user_id)
         sms_challenge_id = self._staff_sms_challenge_id(user.user_id)
-        await self.otp_service.create_challenge(
+        sms_challenge = await self.otp_service.create_challenge(
             challenge_id=sms_challenge_id,
             user_id=user.user_id,
             purpose="staff-2fa-sms",
@@ -310,7 +310,7 @@ class AuthService:
         await self._enqueue_otp_notification(
             email=None,
             phone=staff_profile.sms_phone_e164 if staff_profile else user.phone_e164,
-            code_preview="staff SMS code",
+            code=sms_challenge.code,
         )
         pre2fa_token, _, _ = await self.token_service.issue_pre_2fa_token(
             subject=user.user_id,
@@ -387,20 +387,25 @@ class AuthService:
         *,
         email: str | None,
         phone: str | None,
-        code_preview: str,
+        code: str,
     ) -> None:
+        ttl_minutes = self.settings.otp_ttl_seconds // 60
         if email:
             await self.job_queue.enqueue(
                 "send_email_job",
                 to=email,
                 subject="Your ProxiServe verification code",
-                body=f"Your {code_preview} has been generated.",
+                body=(
+                    f"<p>Your ProxiServe verification code is:</p>"
+                    f"<h2 style='letter-spacing:4px'>{code}</h2>"
+                    f"<p>This code expires in {ttl_minutes} minutes. Do not share it with anyone.</p>"
+                ),
             )
         elif phone:
             await self.job_queue.enqueue(
                 "send_sms_job",
                 to=phone,
-                body=f"Your {code_preview} has been generated.",
+                body=f"ProxiServe code: {code}. Valid {ttl_minutes} min. Do not share.",
             )
 
     async def _enqueue_reset_notification(

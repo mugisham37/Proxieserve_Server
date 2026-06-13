@@ -69,11 +69,22 @@ class Settings(BaseSettings):
     health_path: str = "/health"
     ready_path: str = "/ready"
 
+    otel_endpoint: str | None = Field(default=None, alias="OTEL_EXPORTER_OTLP_ENDPOINT")
+
     @field_validator("app_cors_origins", mode="before")
     @classmethod
     def _parse_cors_origins(cls, value: object) -> list[str]:
         if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
+            stripped = value.strip()
+            # Support JSON-array syntax: APP_CORS_ORIGINS=["http://localhost:3000"]
+            if stripped.startswith("["):
+                import json as _json
+
+                try:
+                    return [str(item) for item in _json.loads(stripped)]
+                except Exception:
+                    pass
+            return [item.strip() for item in stripped.split(",") if item.strip()]
         if isinstance(value, list):
             return [str(item) for item in value]
         return []

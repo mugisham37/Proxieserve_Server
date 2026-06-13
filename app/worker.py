@@ -9,7 +9,17 @@ from app.core.config import get_settings
 from app.core.notifier import EmailNotification, SmsNotification, StubNotifier
 
 settings = get_settings()
-notifier = StubNotifier()
+
+# Use the real SMTP notifier when credentials are configured; fall back to the
+# stub notifier (logs only) during local development without an SMTP server.
+if settings.smtp_username:
+    from app.core.email import SmtpEmailNotifier
+
+    _email_notifier: SmtpEmailNotifier | StubNotifier = SmtpEmailNotifier(settings)
+else:
+    _email_notifier = StubNotifier()
+
+notifier = _email_notifier
 
 
 async def send_email_job(ctx: dict[str, object], *, to: str, subject: str, body: str) -> None:
