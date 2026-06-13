@@ -41,11 +41,15 @@ async def get_auth_service(
     )
 
 
-def get_access_token(access_token: str | None = Cookie(default=None, alias=ACCESS_COOKIE_NAME)) -> str | None:
+def get_access_token(
+    access_token: str | None = Cookie(default=None, alias=ACCESS_COOKIE_NAME),
+) -> str | None:
     return access_token
 
 
-def get_refresh_token(refresh_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE_NAME)) -> str | None:
+def get_refresh_token(
+    refresh_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE_NAME),
+) -> str | None:
     return refresh_token
 
 
@@ -56,7 +60,9 @@ def require_access_payload(
     if access_token is None:
         raise UnauthorizedError()
     try:
-        return decode_token(token=access_token, secret=settings.jwt_access_secret, settings=settings)
+        return decode_token(
+            token=access_token, secret=settings.jwt_access_secret, settings=settings
+        )
     except jwt.PyJWTError as exc:
         raise UnauthorizedError() from exc
 
@@ -68,7 +74,9 @@ def get_access_payload_optional(
     if access_token is None:
         return None
     try:
-        return decode_token(token=access_token, secret=settings.jwt_access_secret, settings=settings)
+        return decode_token(
+            token=access_token, secret=settings.jwt_access_secret, settings=settings
+        )
     except jwt.PyJWTError:
         return None
 

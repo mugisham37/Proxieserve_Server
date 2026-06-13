@@ -5,20 +5,19 @@ from __future__ import annotations
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from alembic import context
-
-# ── Import Base so its metadata is populated ─────────────────────────────────
-from app.core.database import Base  # noqa: E402
 
 # ── Import every model module so SQLAlchemy registers their tables ────────────
 import app.modules.auth.models  # noqa: F401, E402
 
 # ── Pull settings from .env so alembic.ini never needs a hardcoded URL ───────
 from app.core.config import get_settings  # noqa: E402
+
+# ── Import Base so its metadata is populated ─────────────────────────────────
+from app.core.database import Base  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Alembic Config object — gives access to values in alembic.ini

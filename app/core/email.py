@@ -9,7 +9,7 @@ import aiosmtplib
 
 from app.core.config import Settings
 from app.core.logging import get_logger
-from app.core.notifier import EmailNotification
+from app.core.notifier import EmailNotification, SmsNotification
 
 
 class SmtpEmailNotifier:
@@ -42,3 +42,6 @@ class SmtpEmailNotifier:
 
         await aiosmtplib.send(message, **send_kwargs)  # type: ignore[arg-type]
         self.logger.info("email_sent", to=notification.to, subject=notification.subject)
+
+    async def send_sms(self, notification: SmsNotification) -> None:
+        self.logger.warning("send_sms_not_configured", to=notification.to)

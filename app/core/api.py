@@ -24,5 +24,7 @@ def success_response(*, message: str, data: DataT | None = None) -> ApiResponse[
     return ApiResponse(success=True, errorType=None, message=message, data=data)
 
 
-def error_response(*, message: str, error_type: str, data: DataT | None = None) -> ApiResponse[DataT]:
+def error_response(
+    *, message: str, error_type: str, data: DataT | None = None
+) -> ApiResponse[DataT]:
     return ApiResponse(success=False, errorType=error_type, message=message, data=data)

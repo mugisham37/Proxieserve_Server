@@ -91,7 +91,9 @@ class AuthService:
         *,
         ip_address: str | None,
     ) -> ServiceResult[AuthFlowData]:
-        normalized_identifier = self._normalize_identifier(request.identifierType, request.identifier)
+        normalized_identifier = self._normalize_identifier(
+            request.identifierType, request.identifier
+        )
         existing = await self.repository.get_user_by_identifier(
             identifier_type=request.identifierType,
             identifier=normalized_identifier,
@@ -139,10 +141,14 @@ class AuthService:
         )
 
         await self.session.commit()
-        await self.event_bus.publish(UserRegistered(user_id=user.user_id, identifier=normalized_identifier).to_domain_event())
+        await self.event_bus.publish(
+            UserRegistered(user_id=user.user_id, identifier=normalized_identifier).to_domain_event()
+        )
         if request.code:
             await self.event_bus.publish(
-                ApplicationClaimRequested(user_id=user.user_id, code=request.code, phone=phone or "").to_domain_event()
+                ApplicationClaimRequested(
+                    user_id=user.user_id, code=request.code, phone=phone or ""
+                ).to_domain_event()
             )
 
         return ServiceResult(
@@ -159,7 +165,9 @@ class AuthService:
         *,
         ip_address: str | None,
     ) -> ServiceResult[AuthFlowData]:
-        normalized_identifier = self._normalize_identifier(request.identifierType, request.identifier)
+        normalized_identifier = self._normalize_identifier(
+            request.identifierType, request.identifier
+        )
         await self._assert_not_locked(identifier=normalized_identifier, ip_address=ip_address)
 
         user = await self.repository.get_user_by_identifier(
@@ -167,7 +175,9 @@ class AuthService:
             identifier=normalized_identifier,
         )
         if user is None or not await async_verify_password(request.password, user.password_hash):
-            await self._record_login_failure(identifier=normalized_identifier, ip_address=ip_address)
+            await self._record_login_failure(
+                identifier=normalized_identifier, ip_address=ip_address
+            )
             raise InvalidCredentialsError()
 
         await self._clear_lockout(identifier=normalized_identifier, ip_address=ip_address)
@@ -239,12 +249,16 @@ class AuthService:
         request: ForgotPasswordRequest,
     ) -> ServiceResult[ForgotPasswordData]:
         try:
-            normalized_identifier = self._normalize_identifier(request.identifierType, request.identifier)
+            normalized_identifier = self._normalize_identifier(
+                request.identifierType, request.identifier
+            )
         except Exception:
             # Invalid format — return masked stub without revealing whether it exists
             return ServiceResult(
                 payload=ForgotPasswordData(
-                    maskedEmail=self._masked_identifier_value(request.identifierType, request.identifier)
+                    maskedEmail=self._masked_identifier_value(
+                        request.identifierType, request.identifier
+                    )
                 )
             )
         user = await self.repository.get_user_by_identifier(
@@ -257,7 +271,8 @@ class AuthService:
                 id=generate_id("prt"),
                 user_id=user.user_id,
                 token_hash=hash_token(reset_token),
-                expires_at=datetime.now(UTC) + timedelta(seconds=self.settings.password_reset_ttl_seconds),
+                expires_at=datetime.now(UTC)
+                + timedelta(seconds=self.settings.password_reset_ttl_seconds),
             )
             await self._enqueue_reset_notification(
                 email=user.email,
@@ -267,7 +282,11 @@ class AuthService:
             await self.session.commit()
 
         return ServiceResult(
-            payload=ForgotPasswordData(maskedEmail=self._masked_identifier_value(request.identifierType, normalized_identifier))
+            payload=ForgotPasswordData(
+                maskedEmail=self._masked_identifier_value(
+                    request.identifierType, normalized_identifier
+                )
+            )
         )
 
     async def reset_password(
@@ -276,7 +295,11 @@ class AuthService:
     ) -> ServiceResult[VerifyOtpData]:
         token_hash_value = hash_token(request.token)
         reset_token = await self.repository.get_password_reset_token_by_hash(token_hash_value)
-        if reset_token is None or reset_token.used_at is not None or reset_token.expires_at < datetime.now(UTC):
+        if (
+            reset_token is None
+            or reset_token.used_at is not None
+            or reset_token.expires_at < datetime.now(UTC)
+        ):
             raise ResetExpiredError()
 
         user = await self.repository.get_user_by_id(reset_token.user_id)
@@ -373,9 +396,15 @@ class AuthService:
         bundle = await self._issue_session_for_user(user, is_staff=True)
 
         if request.trustDevice:
-            fingerprint = self.token_service.build_device_fingerprint(user_agent=user_agent, ip_address=ip_address)
-            existing = await self.repository.get_trusted_device(user_id=user.user_id, fingerprint_hash=fingerprint)
-            trusted_until = datetime.now(UTC) + timedelta(seconds=self.settings.trusted_device_ttl_seconds)
+            fingerprint = self.token_service.build_device_fingerprint(
+                user_agent=user_agent, ip_address=ip_address
+            )
+            existing = await self.repository.get_trusted_device(
+                user_id=user.user_id, fingerprint_hash=fingerprint
+            )
+            trusted_until = datetime.now(UTC) + timedelta(
+                seconds=self.settings.trusted_device_ttl_seconds
+            )
             if existing is None:
                 await self.repository.create_trusted_device(
                     id=generate_id("tdv"),
@@ -496,7 +525,11 @@ class AuthService:
             await self.redis.expire(attempts_key, self.settings.lockout_window_seconds)
         if current >= self.settings.lockout_max_attempts:
             until = datetime.now(UTC) + timedelta(seconds=self.settings.lockout_window_seconds)
-            await self.redis.setex(self._lockout_until_key(identifier, ip_address), self.settings.lockout_window_seconds, until.isoformat())
+            await self.redis.setex(
+                self._lockout_until_key(identifier, ip_address),
+                self.settings.lockout_window_seconds,
+                until.isoformat(),
+            )
         await self.session.commit()
 
     async def _assert_not_locked(self, *, identifier: str, ip_address: str | None) -> None:
@@ -565,7 +598,9 @@ class AuthService:
 
     @staticmethod
     def _lockout_attempts_key(identifier: str, ip_address: str | None) -> str:
-        return f"auth:lockout:attempts:{hash_token(identifier)}:{hash_token(ip_address or 'unknown')}"
+        return (
+            f"auth:lockout:attempts:{hash_token(identifier)}:{hash_token(ip_address or 'unknown')}"
+        )
 
     @staticmethod
     def _lockout_until_key(identifier: str, ip_address: str | None) -> str:

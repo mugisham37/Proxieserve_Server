@@ -165,7 +165,11 @@ async def staff_two_factor(
     return success_response(message="Staff session established.", data=result.payload)
 
 
-@router.get("/session", response_model=ApiResponse[SessionData], dependencies=[Depends(rate_limit("auth-session", 60, 60))])
+@router.get(
+    "/session",
+    response_model=ApiResponse[SessionData],
+    dependencies=[Depends(rate_limit("auth-session", 60, 60))],
+)
 async def get_session(
     response: Response,
     access_payload: dict[str, Any] | None = Depends(get_access_payload_optional),
@@ -185,7 +189,9 @@ async def get_session(
             if result.token_bundle is not None:
                 service.token_service.apply_session_cookies(response, result.token_bundle)
             return success_response(message="Session refreshed.", data=result.payload)
-        result = await service.get_session(current_user_id=access_payload["sub"], expires_at=expires_at)
+        result = await service.get_session(
+            current_user_id=access_payload["sub"], expires_at=expires_at
+        )
         return success_response(message="Session is valid.", data=result.payload)
     if refresh_token is None:
         raise UnauthorizedError()

@@ -52,7 +52,9 @@ def verify_password(password: str, password_hash: str) -> bool:
 async def async_verify_password(password: str, password_hash: str) -> bool:
     loop = asyncio.get_running_loop()
     try:
-        return await loop.run_in_executor(None, partial(password_hasher.verify, password_hash, password))
+        return await loop.run_in_executor(
+            None, partial(password_hasher.verify, password_hash, password)
+        )
     except Exception:
         return False
 
@@ -94,7 +96,9 @@ def create_access_token(
     expires_in_seconds: int | None = None,
 ) -> tuple[str, datetime, str]:
     token_id = generate_id("atk")
-    expires_at = utc_now() + timedelta(seconds=expires_in_seconds or settings.jwt_access_ttl_seconds)
+    expires_at = utc_now() + timedelta(
+        seconds=expires_in_seconds or settings.jwt_access_ttl_seconds
+    )
     payload = {
         "iss": settings.jwt_issuer,
         "aud": settings.jwt_audience,

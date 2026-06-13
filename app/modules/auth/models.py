@@ -26,7 +26,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     language: Mapped[str] = mapped_column(String(8), nullable=False, default="en")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,
@@ -34,7 +36,9 @@ class User(Base):
         nullable=False,
     )
 
-    staff_profile: Mapped["StaffProfile | None"] = relationship(back_populates="user", uselist=False)
+    staff_profile: Mapped["StaffProfile | None"] = relationship(
+        back_populates="user", uselist=False
+    )
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")
     trusted_devices: Mapped[list["TrustedDevice"]] = relationship(back_populates="user")
     reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user")
@@ -45,11 +49,15 @@ class User(Base):
 class StaffProfile(Base):
     __tablename__ = "staff_profiles"
 
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True
+    )
     totp_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     twofa_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sms_phone_e164: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     user: Mapped[User] = relationship(back_populates="staff_profile")
 
@@ -58,13 +66,17 @@ class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
     family_id: Mapped[str] = mapped_column(String(64), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     replaced_by_token_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="refresh_tokens")
@@ -79,15 +91,21 @@ class TrustedDevice(Base):
     __tablename__ = "trusted_devices"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
     fingerprint_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     trusted_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     user: Mapped[User] = relationship(back_populates="trusted_devices")
 
     __table_args__ = (
-        UniqueConstraint("user_id", "fingerprint_hash", name="uq_trusted_devices_user_id_fingerprint_hash"),
+        UniqueConstraint(
+            "user_id", "fingerprint_hash", name="uq_trusted_devices_user_id_fingerprint_hash"
+        ),
     )
 
 
@@ -95,11 +113,15 @@ class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     user: Mapped[User] = relationship(back_populates="reset_tokens")
 
@@ -108,9 +130,13 @@ class TermsAcceptance(Base):
     __tablename__ = "terms_acceptances"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
     policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
-    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    accepted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     user: Mapped[User] = relationship(back_populates="terms_acceptances")
 
@@ -124,7 +150,9 @@ class LoginAttempt(Base):
     identifier: Mapped[str] = mapped_column(String(255), nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
     success: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    attempted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     __table_args__ = (
         Index("ix_login_attempts_identifier", "identifier"),
@@ -136,10 +164,14 @@ class BackupCode(Base):
     __tablename__ = "backup_codes"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
     code_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     user: Mapped[User] = relationship(back_populates="backup_codes")
 

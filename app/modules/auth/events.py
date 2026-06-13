@@ -13,7 +13,10 @@ class UserRegistered:
     identifier: str
 
     def to_domain_event(self) -> DomainEvent:
-        return DomainEvent(name="auth.user_registered", payload={"userId": self.user_id, "identifier": self.identifier})
+        return DomainEvent(
+            name="auth.user_registered",
+            payload={"userId": self.user_id, "identifier": self.identifier},
+        )
 
 
 @dataclass(slots=True)

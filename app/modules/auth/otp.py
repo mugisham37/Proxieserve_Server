@@ -31,7 +31,9 @@ class OtpService:
         self.settings = settings
         self.redis = redis
 
-    async def create_challenge(self, *, challenge_id: str, user_id: str, purpose: str, channel: str) -> OtpChallenge:
+    async def create_challenge(
+        self, *, challenge_id: str, user_id: str, purpose: str, channel: str
+    ) -> OtpChallenge:
         code = generate_otp_code()
         expires_at = datetime.now(UTC) + timedelta(seconds=self.settings.otp_ttl_seconds)
         challenge = OtpChallenge(

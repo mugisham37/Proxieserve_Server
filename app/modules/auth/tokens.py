@@ -69,7 +69,9 @@ class TokenService:
         refresh_family_id = generate_id("rtf")
         refresh_expires_at = datetime.now(UTC).replace(microsecond=0)
         ttl_seconds = (
-            self.settings.jwt_staff_refresh_ttl_seconds if is_staff else self.settings.jwt_refresh_ttl_seconds
+            self.settings.jwt_staff_refresh_ttl_seconds
+            if is_staff
+            else self.settings.jwt_refresh_ttl_seconds
         )
         refresh_expires_at = refresh_expires_at + timedelta(seconds=ttl_seconds)
         refresh_record = {
@@ -144,11 +146,15 @@ class TokenService:
             expires_in_seconds=self.settings.jwt_pre_2fa_ttl_seconds,
             claims=claims,
         )
-        await self.redis.setex(self._pre_2fa_key(token_id), self.settings.jwt_pre_2fa_ttl_seconds, "active")
+        await self.redis.setex(
+            self._pre_2fa_key(token_id), self.settings.jwt_pre_2fa_ttl_seconds, "active"
+        )
         return token, expires_at, token_id
 
     async def consume_pre_2fa_token(self, token: str) -> dict[str, Any]:
-        payload = decode_token(token=token, secret=self.settings.jwt_pre_2fa_secret, settings=self.settings)
+        payload = decode_token(
+            token=token, secret=self.settings.jwt_pre_2fa_secret, settings=self.settings
+        )
         token_id = payload["jti"]
         key = self._pre_2fa_key(token_id)
         was_active = await self.redis.get(key)

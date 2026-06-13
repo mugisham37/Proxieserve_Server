@@ -105,7 +105,9 @@ class UnauthorizedError(AppError):
 
 
 class ForbiddenError(AppError):
-    def __init__(self, *, message: str = "You do not have permission to access this resource.") -> None:
+    def __init__(
+        self, *, message: str = "You do not have permission to access this resource."
+    ) -> None:
         super().__init__(message=message, error_type="forbidden", status_code=403)
 
 

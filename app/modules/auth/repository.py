@@ -69,10 +69,14 @@ class AuthRepository:
     async def get_refresh_token_by_hash(self, token_hash: str) -> RefreshToken | None:
         return cast(
             RefreshToken | None,
-            await self.session.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash)),
+            await self.session.scalar(
+                select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+            ),
         )
 
-    async def mark_refresh_token_replaced(self, *, token_id: str, replaced_by_token_id: str) -> None:
+    async def mark_refresh_token_replaced(
+        self, *, token_id: str, replaced_by_token_id: str
+    ) -> None:
         token = await self.session.get(RefreshToken, token_id)
         if token is None:
             return
@@ -88,7 +92,9 @@ class AuthRepository:
         )
 
     async def delete_refresh_tokens_for_user(self, user_id: str) -> None:
-        result = await self.session.scalars(select(RefreshToken).where(RefreshToken.user_id == user_id))
+        result = await self.session.scalars(
+            select(RefreshToken).where(RefreshToken.user_id == user_id)
+        )
         for token in result:
             token.revoked_at = utc_now()
         await self.session.flush()
@@ -130,7 +136,9 @@ class AuthRepository:
         await self.session.flush()
         return device
 
-    async def get_trusted_device(self, *, user_id: str, fingerprint_hash: str) -> TrustedDevice | None:
+    async def get_trusted_device(
+        self, *, user_id: str, fingerprint_hash: str
+    ) -> TrustedDevice | None:
         stmt = select(TrustedDevice).where(
             TrustedDevice.user_id == user_id,
             TrustedDevice.fingerprint_hash == fingerprint_hash,

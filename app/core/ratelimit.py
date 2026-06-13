@@ -24,7 +24,9 @@ class RedisRateLimiter:
             raise RateLimitedError(retry_after_seconds=window_seconds)
 
 
-def rate_limit(name: str, limit: int, window_seconds: int) -> Callable[[Request, Redis], Awaitable[None]]:
+def rate_limit(
+    name: str, limit: int, window_seconds: int
+) -> Callable[[Request, Redis], Awaitable[None]]:
     async def dependency(request: Request, redis: Redis = Depends(get_redis)) -> None:
         client_host = request.client.host if request.client else "unknown"
         raw = f"{name}:{client_host}:{request.url.path}"
