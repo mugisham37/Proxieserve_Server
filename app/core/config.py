@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     smtp_password: str | None = Field(default=None, alias="SMTP_PASSWORD")
     sms_provider: str = Field(default="stub", alias="SMS_PROVIDER")
 
+    # Admin seeding — set both to create the initial admin account on startup.
+    # If either is blank, seeding is skipped. Idempotent: runs only when no admin exists.
+    admin_seed_email: str | None = Field(default=None, alias="ADMIN_SEED_EMAIL")
+    admin_seed_password: str | None = Field(default=None, alias="ADMIN_SEED_PASSWORD")
+
     metrics_path: str = "/metrics"
     health_path: str = "/health"
     ready_path: str = "/ready"

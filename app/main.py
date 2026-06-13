@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 from fastapi import FastAPI
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.core.api import ApiResponse, success_response
 from app.core.config import Settings, get_settings
@@ -16,8 +18,55 @@ from app.core.logging import setup_logging
 from app.core.middleware import configure_middleware, register_exception_handlers
 from app.core.observability import configure_observability
 from app.core.redis import redis_manager
+from app.core.security import generate_id, hash_password
 from app.modules.applications.router import router as applications_router
+from app.modules.auth.models import StaffProfile, User
 from app.modules.auth.router import router as auth_router
+
+_logger = logging.getLogger(__name__)
+
+
+async def _seed_admin(settings: Settings) -> None:
+    """Create the initial admin account if ADMIN_SEED_EMAIL and ADMIN_SEED_PASSWORD are set."""
+    email = (settings.admin_seed_email or "").strip()
+    password = (settings.admin_seed_password or "").strip()
+    if not email or not password:
+        return
+
+    async with db_manager.session() as session:
+        existing = await session.scalar(select(User).where(User.role == "staff:admin").limit(1))
+        if existing is not None:
+            _logger.info("Admin account already exists — skipping seed.")
+            return
+
+        user_id = generate_id("usr")
+        now = datetime.now(UTC)
+        user = User(
+            user_id=user_id,
+            name="Admin",
+            email=email.lower(),
+            phone_e164=None,
+            password_hash=hash_password(password),
+            role="staff:admin",
+            is_active=True,
+            is_email_verified=True,
+            language="en",
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(user)
+        await session.flush()
+
+        profile = StaffProfile(
+            user_id=user_id,
+            totp_secret_encrypted=None,
+            twofa_enabled=True,
+            sms_phone_e164=None,
+            created_at=now,
+        )
+        session.add(profile)
+        await session.commit()
+        _logger.info("Admin account seeded successfully for %s.", email)
 
 
 @asynccontextmanager
@@ -27,6 +76,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     db_manager.configure(settings)
     redis_manager.configure(settings)
     await job_queue_manager.configure(settings)
+    await _seed_admin(settings)
     yield
     await job_queue_manager.close()
     await redis_manager.close()
@@ -67,8 +117,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await connection.execute(text("SELECT 1"))
         return success_response(message="Dependencies are ready.", data={"status": "ready"})
 
+    from app.modules.admin.router import router as admin_router
+
     app.include_router(auth_router)
     app.include_router(applications_router)
+    app.include_router(admin_router)
 
     return app
 
