@@ -296,7 +296,12 @@ class AuthService:
     ) -> ServiceResult[StaffLoginData]:
         user = await self.repository.get_user_by_email(str(request.email).lower())
         expected_role = "staff:admin" if request.role == "admin" else "staff:agent"
-        if user is None or user.role != expected_role or not verify_password(request.password, user.password_hash):
+        if (
+            user is None
+            or user.role != expected_role
+            or not user.is_active
+            or not verify_password(request.password, user.password_hash)
+        ):
             raise InvalidCredentialsError()
 
         staff_profile = await self.repository.get_staff_profile(user.user_id)
@@ -442,7 +447,7 @@ class AuthService:
         if refresh_payload is None:
             raise UnauthorizedError()
         user = await self.repository.get_user_by_id(refresh_payload["userId"])
-        if user is None:
+        if user is None or not user.is_active:
             raise UnauthorizedError()
         bundle = await self._issue_session_for_user(user, is_staff=user.role.startswith("staff:"))
         await self.repository.revoke_refresh_family(refresh_payload["familyId"])
