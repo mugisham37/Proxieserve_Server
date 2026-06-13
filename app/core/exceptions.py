@@ -102,3 +102,22 @@ class RateLimitedError(AppError):
 class UnauthorizedError(AppError):
     def __init__(self, *, message: str = "Authentication required.") -> None:
         super().__init__(message=message, error_type="unauthorized", status_code=401)
+
+
+class ForbiddenError(AppError):
+    def __init__(self, *, message: str = "You do not have permission to access this resource.") -> None:
+        super().__init__(message=message, error_type="forbidden", status_code=403)
+
+
+class AgentNotFoundError(AppError):
+    def __init__(self) -> None:
+        super().__init__(message="Agent not found.", error_type="agent-not-found", status_code=404)
+
+
+class EmailAlreadyInUseError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="An account with that email address already exists.",
+            error_type="email-already-in-use",
+            status_code=409,
+        )
