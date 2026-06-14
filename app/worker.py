@@ -6,33 +6,38 @@ from arq import run_worker
 from arq.connections import RedisSettings
 
 from app.core.config import get_settings
+from app.core.email import SmtpEmailNotifier
+from app.core.logging import get_logger
 from app.core.notifier import EmailNotification, SmsNotification, StubNotifier
 
-settings = get_settings()
+logger = get_logger("worker")
 
-# Use the real SMTP notifier when credentials are configured; fall back to the
-# stub notifier (logs only) during local development without an SMTP server.
-if settings.smtp_username:
-    from app.core.email import SmtpEmailNotifier
 
-    _email_notifier: SmtpEmailNotifier | StubNotifier = SmtpEmailNotifier(settings)
-else:
-    _email_notifier = StubNotifier()
-
-notifier = _email_notifier
+def _build_notifier() -> SmtpEmailNotifier | StubNotifier:
+    settings = get_settings()
+    if settings.smtp_username and settings.smtp_password:
+        logger.info("email_notifier_smtp", host=settings.smtp_host, port=settings.smtp_port)
+        return SmtpEmailNotifier(settings)
+    logger.warning("email_notifier_stub", reason="SMTP_USERNAME/SMTP_PASSWORD not configured")
+    return StubNotifier()
 
 
 async def send_email_job(ctx: dict[str, object], *, to: str, subject: str, body: str) -> None:
+    notifier = _build_notifier()
     await notifier.send_email(EmailNotification(to=to, subject=subject, body=body))
 
 
 async def send_sms_job(ctx: dict[str, object], *, to: str, body: str) -> None:
+    settings = get_settings()
+    notifier: SmtpEmailNotifier | StubNotifier = (
+        SmtpEmailNotifier(settings) if settings.smtp_username else StubNotifier()
+    )
     await notifier.send_sms(SmsNotification(to=to, body=body))
 
 
 class WorkerSettings:
     functions = [send_email_job, send_sms_job]
-    redis_settings = RedisSettings.from_dsn(settings.redis_url)
+    redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
 
 
 if __name__ == "__main__":

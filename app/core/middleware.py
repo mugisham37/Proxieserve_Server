@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -14,6 +15,27 @@ from fastapi.responses import JSONResponse, Response
 from app.core.api import error_response
 from app.core.config import Settings
 from app.core.exceptions import AppError
+
+_SENSITIVE_FIELDS = frozenset(
+    {"password", "new_password", "confirm_password", "token", "otp", "code", "secret", "refresh_token"}
+)
+_SKIP_HEADER_NAMES = frozenset({"authorization", "cookie", "x-forwarded-for", "host"})
+
+
+def _sanitize_body(raw: bytes) -> dict | None:
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (ValueError, UnicodeDecodeError):
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return {k: "***" if k in _SENSITIVE_FIELDS else v for k, v in parsed.items()}
+
+
+def _filter_headers(headers: dict[str, str]) -> dict[str, str]:
+    return {k: v for k, v in headers.items() if k.lower() not in _SKIP_HEADER_NAMES}
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -62,6 +84,10 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
         request.state.request_id = request_id
         structlog.contextvars.bind_contextvars(request_id=request_id)
 
+        # Read and cache body before handing off to the route handler.
+        # Starlette caches it in request._body so downstream reads work normally.
+        body_bytes = await request.body()
+
         response = await call_next(request)
         duration_ms = (time.perf_counter() - start) * 1000
         response.headers["x-request-id"] = request_id
@@ -70,12 +96,27 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
         response.headers["referrer-policy"] = "strict-origin-when-cross-origin"
         response.headers["x-frame-options"] = "DENY"
 
-        logger.info(
-            "request_complete",
-            method=request.method,
-            path=request.url.path,
-            status_code=response.status_code,
-            duration_ms=round(duration_ms, 2),
-        )
+        log_kwargs: dict = {
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": response.status_code,
+            "duration_ms": round(duration_ms, 2),
+            "headers": _filter_headers(dict(request.headers)),
+        }
+
+        query = str(request.url.query)
+        if query:
+            log_kwargs["query"] = query
+
+        if request.method in {"POST", "PUT", "PATCH"} and body_bytes:
+            sanitized = _sanitize_body(body_bytes)
+            if sanitized is not None:
+                log_kwargs["body"] = sanitized
+
+        if response.status_code >= 400:
+            logger.warning("request_complete", **log_kwargs)
+        else:
+            logger.info("request_complete", **log_kwargs)
+
         structlog.contextvars.clear_contextvars()
         return response
