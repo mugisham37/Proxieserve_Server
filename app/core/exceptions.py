@@ -123,3 +123,139 @@ class EmailAlreadyInUseError(AppError):
             error_type="email-already-in-use",
             status_code=409,
         )
+
+
+class ServiceNotFoundError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="Service not found.",
+            error_type="service-not-found",
+            status_code=404,
+        )
+
+
+class ServiceSlugConflictError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="A service with this slug already exists.",
+            error_type="service-slug-conflict",
+            status_code=409,
+        )
+
+
+class ApplicationNotFoundError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="Application not found.",
+            error_type="application-not-found",
+            status_code=404,
+        )
+
+
+class ApplicationAccessForbiddenError(AppError):
+    def __init__(self, *, code: str | None = None) -> None:
+        data = {"code": code} if code else None
+        super().__init__(
+            message="You do not have permission to access this application.",
+            error_type="application-access-forbidden",
+            status_code=403,
+            data=data,
+        )
+
+
+class InvalidStatusTransitionError(AppError):
+    def __init__(self, *, current_status: str, valid_next_statuses: list[str]) -> None:
+        super().__init__(
+            message=f"Cannot transition from '{current_status}' to the requested status.",
+            error_type="invalid-status-transition",
+            status_code=422,
+            data={
+                "currentStatus": current_status,
+                "validNextStatuses": valid_next_statuses,
+            },
+        )
+
+
+class DocumentNotFoundError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="Document not found.",
+            error_type="document-not-found",
+            status_code=404,
+        )
+
+
+class DocumentTypeNotAllowedError(AppError):
+    def __init__(self, *, detected_type: str, allowed_types: list[str]) -> None:
+        super().__init__(
+            message="The uploaded file type is not allowed for this document requirement.",
+            error_type="document-type-not-allowed",
+            status_code=422,
+            data={"detectedType": detected_type, "allowedTypes": allowed_types},
+        )
+
+
+class FileTooLargeError(AppError):
+    def __init__(self, *, max_bytes: int) -> None:
+        super().__init__(
+            message="The uploaded file exceeds the maximum allowed size.",
+            error_type="file-too-large",
+            status_code=413,
+            data={"maxBytes": max_bytes},
+        )
+
+
+class DocumentAccessForbiddenError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="You do not have permission to access this document.",
+            error_type="document-access-forbidden",
+            status_code=403,
+        )
+
+
+class AgentNotAvailableError(AppError):
+    def __init__(self, *, reason: str = "Agent is not available for new cases.") -> None:
+        super().__init__(
+            message=reason,
+            error_type="agent-not-available",
+            status_code=409,
+        )
+
+
+class ApplicationAlreadyAssignedError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="This application has already been assigned to an agent.",
+            error_type="application-already-assigned",
+            status_code=409,
+        )
+
+
+class DailyCapExceededError(AppError):
+    def __init__(self, *, cap: int) -> None:
+        super().__init__(
+            message="The agent has reached their daily case cap.",
+            error_type="daily-cap-exceeded",
+            status_code=409,
+            data={"cap": cap},
+        )
+
+
+class MessageNotFoundError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="Message not found.",
+            error_type="message-not-found",
+            status_code=404,
+        )
+
+
+class ValidationError(AppError):
+    def __init__(self, *, message: str, fields: list[str] | None = None) -> None:
+        super().__init__(
+            message=message,
+            error_type="validation-error",
+            status_code=422,
+            data={"fields": fields or []},
+        )
