@@ -19,9 +19,9 @@ from app.core.middleware import configure_middleware, register_exception_handler
 from app.core.observability import configure_observability
 from app.core.redis import redis_manager
 from app.core.security import generate_id
-from app.modules.applications.router import router as applications_router
 from app.modules.auth.models import StaffProfile, User
 from app.modules.auth.router import router as auth_router
+from app.seed import seed_dev_services
 
 _logger = logging.getLogger(__name__)
 
@@ -81,7 +81,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     db_manager.configure(settings)
     redis_manager.configure(settings)
     await job_queue_manager.configure(settings)
+    import os
+
+    os.makedirs(settings.upload_dir, exist_ok=True)
     await _seed_admin()
+    await seed_dev_services()
     yield
     await job_queue_manager.close()
     await redis_manager.close()
@@ -123,9 +127,60 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return success_response(message="Dependencies are ready.", data={"status": "ready"})
 
     from app.modules.admin.router import router as admin_router
+    from app.modules.applications.router import (
+        admin_router as applications_admin_router,
+    )
+    from app.modules.applications.router import (
+        agent_router as applications_agent_router,
+    )
+    from app.modules.applications.router import (
+        analytics_router,
+        tracker_router,
+    )
+    from app.modules.applications.router import (
+        client_router as applications_client_router,
+    )
+    from app.modules.applications.router import (
+        legacy_router as applications_legacy_router,
+    )
+    from app.modules.assignments.router import router as assignments_router
+    from app.modules.documents.router import (
+        agent_router as documents_agent_router,
+    )
+    from app.modules.documents.router import (
+        client_router as documents_client_router,
+    )
+    from app.modules.documents.router import (
+        download_router as documents_download_router,
+    )
+    from app.modules.messages.router import (
+        admin_router as messages_admin_router,
+    )
+    from app.modules.messages.router import (
+        agent_router as messages_agent_router,
+    )
+    from app.modules.messages.router import (
+        client_router as messages_client_router,
+    )
+    from app.modules.services.router import admin_router as services_admin_router
+    from app.modules.services.router import public_router as services_public_router
 
     app.include_router(auth_router)
-    app.include_router(applications_router)
+    app.include_router(services_public_router)
+    app.include_router(services_admin_router)
+    app.include_router(applications_client_router)
+    app.include_router(applications_legacy_router)
+    app.include_router(documents_client_router)
+    app.include_router(messages_client_router)
+    app.include_router(tracker_router)
+    app.include_router(applications_agent_router)
+    app.include_router(documents_agent_router)
+    app.include_router(messages_agent_router)
+    app.include_router(assignments_router)
+    app.include_router(applications_admin_router)
+    app.include_router(messages_admin_router)
+    app.include_router(analytics_router)
+    app.include_router(documents_download_router)
     app.include_router(admin_router)
 
     return app
