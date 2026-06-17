@@ -72,6 +72,10 @@ class Settings(BaseSettings):
 
     otel_endpoint: str | None = Field(default=None, alias="OTEL_EXPORTER_OTLP_ENDPOINT")
 
+    upload_dir: str = Field(default="/tmp/proxiserve_uploads", alias="UPLOAD_DIR")
+    upload_max_size_bytes: int = Field(default=10_485_760, alias="UPLOAD_MAX_SIZE_BYTES")
+    file_qc_min_image_dimension: int = Field(default=400, alias="FILE_QC_MIN_IMAGE_DIMENSION")
+
     @field_validator("app_cors_origins", mode="before")
     @classmethod
     def _parse_cors_origins(cls, value: object) -> list[str]:
