@@ -12,6 +12,11 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # ── Import every model module so SQLAlchemy registers their tables ────────────
 import app.modules.auth.models  # noqa: F401, E402
+import app.modules.services.models  # noqa: F401, E402
+import app.modules.applications.models  # noqa: F401, E402
+import app.modules.messages.models  # noqa: F401, E402
+import app.modules.documents.models  # noqa: F401, E402
+import app.modules.assignments.models  # noqa: F401, E402
 
 # ── Pull settings from .env so alembic.ini never needs a hardcoded URL ───────
 from app.core.config import get_settings  # noqa: E402
