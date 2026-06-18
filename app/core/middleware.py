@@ -15,6 +15,8 @@ from fastapi.responses import JSONResponse, Response
 from app.core.api import error_response
 from app.core.config import Settings
 from app.core.exceptions import AppError
+from app.core.database import db_manager
+from app.core.redis import redis_manager
 
 _SENSITIVE_FIELDS = frozenset(
     {"password", "new_password", "confirm_password", "token", "otp", "code", "secret", "refresh_token"}
@@ -88,6 +90,22 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
         # Starlette caches it in request._body so downstream reads work normally.
         body_bytes = await request.body()
 
+        if not request.url.path.startswith("/api/admin") and request.url.path not in {
+            "/health",
+            "/ready",
+            "/metrics",
+            "/",
+        }:
+            maintenance = await _get_maintenance_mode()
+            if maintenance:
+                return JSONResponse(
+                    status_code=503,
+                    content=error_response(
+                        message="The platform is temporarily unavailable for maintenance.",
+                        error_type="maintenance-mode",
+                    ).model_dump(mode="json"),
+                )
+
         response = await call_next(request)
         duration_ms = (time.perf_counter() - start) * 1000
         response.headers["x-request-id"] = request_id
@@ -120,3 +138,23 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
 
         structlog.contextvars.clear_contextvars()
         return response
+
+
+async def _get_maintenance_mode() -> bool:
+    cache_key = "platform:maintenance_mode"
+    if redis_manager.client is not None:
+        cached = await redis_manager.client.get(cache_key)
+        if cached is not None:
+            return cached == b"1"
+    if db_manager.session_factory is None:
+        return False
+    from app.modules.platform.repository import PlatformRepository
+
+    async with db_manager.session_factory() as session:
+        repo = PlatformRepository(session)
+        settings = await repo.get_or_create()
+        value = settings.maintenance_mode
+        await session.commit()
+    if redis_manager.client is not None:
+        await redis_manager.client.setex(cache_key, 5, "1" if value else "0")
+    return value
