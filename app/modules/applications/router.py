@@ -12,18 +12,20 @@ from app.core.ratelimit import rate_limit
 from app.modules.applications.schemas import (
     AdminApplicationListResponse,
     AgentCaseListResponse,
-    AnalyticsResponse,
     ApplicationClaimData,
     ApplicationClaimRequest,
     ApplicationDetailResponse,
     ApplicationListResponse,
     ApplicationLookupData,
     CancelApplicationRequest,
+    DashboardSummaryResponse,
     SubmitApplicationRequest,
     SubmitApplicationResponse,
     TrackerResponse,
     UpdateStatusRequest,
 )
+from app.modules.analytics.schemas import AnalyticsResponse
+from app.modules.analytics.service import AnalyticsService
 from app.modules.applications.service import ApplicationsService
 from app.modules.assignments.schemas import AssignAgentRequest
 from app.modules.assignments.service import AssignmentsService
@@ -86,6 +88,19 @@ async def list_applications(
 ) -> ApiResponse[ApplicationListResponse]:
     data = await service.list_client_applications(str(token["user_id"]))
     return success_response(message="Applications retrieved.", data=data)
+
+
+@client_router.get(
+    "/summary",
+    response_model=ApiResponse[DashboardSummaryResponse],
+    dependencies=[REQUIRE_CLIENT, Depends(rate_limit("applications-summary", 60, 60))],
+)
+async def get_applications_summary(
+    token: dict[str, object] = Depends(require_access_payload),
+    service: ApplicationsService = Depends(_get_applications_service),
+) -> ApiResponse[DashboardSummaryResponse]:
+    data = await service.get_dashboard_summary(str(token["user_id"]))
+    return success_response(message="Dashboard summary retrieved.", data=data)
 
 
 @client_router.get(
@@ -287,6 +302,7 @@ async def get_admin_application(
 async def assign_application(
     code: str,
     payload: AssignAgentRequest,
+    request: Request,
     token: dict[str, object] = Depends(require_access_payload),
     assignments: AssignmentsService = Depends(_get_assignments_service),
 ) -> ApiResponse[None]:
@@ -294,8 +310,25 @@ async def assign_application(
         code=code,
         admin_id=str(token["user_id"]),
         payload=payload,
+        ip_address=request.client.host if request.client else None,
     )
     return success_response(message="Application assigned.", data=None)
+
+
+@admin_router.post(
+    "/{code}/auto-assign",
+    response_model=ApiResponse[dict[str, bool]],
+    dependencies=[REQUIRE_ADMIN, Depends(rate_limit("admin-auto-assign", 30, 60))],
+)
+async def auto_assign_application(
+    code: str,
+    assignments: AssignmentsService = Depends(_get_assignments_service),
+) -> ApiResponse[dict[str, bool]]:
+    assigned = await assignments.auto_assign_by_admin(code=code)
+    return success_response(
+        message="Auto-assignment completed." if assigned else "No agent qualified.",
+        data={"assigned": assigned},
+    )
 
 
 @admin_router.patch(
@@ -322,13 +355,19 @@ async def admin_update_status(
 analytics_router = APIRouter(prefix="/api/admin", tags=["admin-analytics"])
 
 
+def _get_analytics_service(
+    session: AsyncSession = Depends(get_db_session),
+) -> AnalyticsService:
+    return AnalyticsService(session)
+
+
 @analytics_router.get(
     "/analytics",
     response_model=ApiResponse[AnalyticsResponse],
     dependencies=[REQUIRE_ADMIN, Depends(rate_limit("admin-analytics", 30, 60))],
 )
 async def get_analytics(
-    service: ApplicationsService = Depends(_get_applications_service),
+    service: AnalyticsService = Depends(_get_analytics_service),
 ) -> ApiResponse[AnalyticsResponse]:
     data = await service.get_analytics()
     return success_response(message="Analytics retrieved.", data=data)
