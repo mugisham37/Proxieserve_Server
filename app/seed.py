@@ -139,6 +139,23 @@ async def seed_dev_services() -> None:
         _logger.info("Seeded %d development services.", len(seeds))
 
 
+async def seed_platform_settings() -> None:
+    if db_manager.session_factory is None:
+        return
+    from datetime import UTC, datetime
+
+    from app.modules.platform.models import PlatformSettings
+
+    async with db_manager.session_factory() as session:
+        existing = await session.get(PlatformSettings, "global")
+        if existing is not None:
+            _logger.info("Platform settings already seeded — skipping.")
+            return
+        session.add(PlatformSettings(id="global", updated_at=datetime.now(UTC)))
+        await session.commit()
+        _logger.info("Seeded global platform settings.")
+
+
 def _default_mimes(doc_type: str) -> list[str]:
     if doc_type == "photo":
         return ["image/jpeg", "image/png", "image/webp"]
