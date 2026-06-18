@@ -75,6 +75,15 @@ class ApplicationListResponse(BaseModel):
     applications: list[ApplicationSummaryResponse]
 
 
+class PaymentInfoResponse(BaseModel):
+    method: str
+    amount: int
+    governmentFee: int
+    vatRate: float
+    paidAt: datetime | None = None
+    receiptNumber: str | None = None
+
+
 class StatusHistoryResponse(BaseModel):
     status: str
     changed_by: str | None = None
@@ -96,6 +105,9 @@ class ApplicationDetailResponse(BaseModel):
     service_data: dict[str, object]
     payment_status: str
     payment_amount: int | None = None
+    status_display: str
+    payment_info: PaymentInfoResponse | None = None
+    sla_deadline: datetime | None = None
     submitted_at: datetime
     assigned_agent_id: str | None = None
     status_history: list[StatusHistoryResponse] = Field(default_factory=list)
@@ -145,6 +157,7 @@ class AgentCaseSummary(BaseModel):
     tier: str
     submitted_at: datetime
     sla_state: str
+    sla_deadline: datetime | None = None
     unread_messages: int = 0
 
 
@@ -152,9 +165,11 @@ class AgentCaseListResponse(BaseModel):
     cases: list[AgentCaseSummary]
 
 
-class AnalyticsResponse(BaseModel):
-    by_status: dict[str, int]
-    by_service: list[dict[str, object]]
-    total_applications: int
-    sla_compliance_rate: float
-    payment_pending_count: int
+class DashboardSummaryResponse(BaseModel):
+    unreadCount: int
+    actionCount: int
+    activeCount: int
+    completedCount: int
+    docCount: int
+    docSizeMB: float
+    avgTurnaround: float | None = None
