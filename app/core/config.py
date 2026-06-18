@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     upload_max_size_bytes: int = Field(default=10_485_760, alias="UPLOAD_MAX_SIZE_BYTES")
     file_qc_min_image_dimension: int = Field(default=400, alias="FILE_QC_MIN_IMAGE_DIMENSION")
 
+    payment_gateway: str = Field(default="stub", alias="PAYMENT_GATEWAY")
+    payment_webhook_secret: str = Field(default="dev-webhook-secret", alias="PAYMENT_WEBHOOK_SECRET")
+
     @field_validator("app_cors_origins", mode="before")
     @classmethod
     def _parse_cors_origins(cls, value: object) -> list[str]:
