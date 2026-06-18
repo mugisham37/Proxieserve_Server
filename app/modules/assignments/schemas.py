@@ -41,3 +41,47 @@ class UnassignedCaseResponse(BaseModel):
 class UnassignedQueueResponse(BaseModel):
     count: int
     cases: list[UnassignedCaseResponse]
+
+
+class AgentSkillItem(BaseModel):
+    service_category: str
+    proficiency_level: int = Field(ge=1, le=5)
+    notes: str | None = None
+
+
+class AgentSkillsResponse(BaseModel):
+    agent_id: str
+    skills: list[AgentSkillItem]
+
+
+class SetAgentSkillsRequest(BaseModel):
+    skills: list[AgentSkillItem]
+
+
+class LeaderboardEntryResponse(BaseModel):
+    initials: str
+    name: str
+    count: int
+    isMe: bool
+
+
+class WeeklyBarResponse(BaseModel):
+    week: str
+    count: int
+    isCurrent: bool | None = None
+
+
+class AgentMetricsResponse(BaseModel):
+    completedCount: int
+    completedDelta: str
+    avgTurnaround: float
+    avgTurnaroundDelta: str
+    onTimeSLAPercent: float
+    clientRating: float
+    ratingsCount: int
+    weeklyBars: list[WeeklyBarResponse]
+    leaderboard: list[LeaderboardEntryResponse]
+
+
+class LeaderboardResponse(BaseModel):
+    leaderboard: list[LeaderboardEntryResponse]
