@@ -259,3 +259,57 @@ class ValidationError(AppError):
             status_code=422,
             data={"fields": fields or []},
         )
+
+
+class AgentSkillNotFoundError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="Agent skill profile not found.",
+            error_type="agent-skill-not-found",
+            status_code=404,
+        )
+
+
+class InvalidServiceCategoryError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="Invalid service category.",
+            error_type="invalid-service-category",
+            status_code=422,
+        )
+
+
+class PaymentNotFoundError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="Payment not found.",
+            error_type="payment-not-found",
+            status_code=404,
+        )
+
+
+class PaymentAlreadyPaidError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="This application has already been paid.",
+            error_type="payment-already-paid",
+            status_code=409,
+        )
+
+
+class PaymentExpiredError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="The payment window has expired.",
+            error_type="payment-expired",
+            status_code=410,
+        )
+
+
+class PaymentGatewayError(AppError):
+    def __init__(self, *, message: str = "Payment gateway error.") -> None:
+        super().__init__(
+            message=message,
+            error_type="payment-gateway-error",
+            status_code=502,
+        )
