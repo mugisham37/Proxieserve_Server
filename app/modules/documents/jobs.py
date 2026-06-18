@@ -84,7 +84,7 @@ async def document_qc_job(ctx: dict[str, object], *, document_id: str) -> None:
             if application is None:
                 return
             client = await auth_repo.get_user_by_id(application.client_id)
-            if client and client.email and job_queue_manager.redis_pool:
+            if client and client.email and job_queue_manager.redis:
                 await job_queue_manager.enqueue(
                     "send_email_job",
                     to=client.email,
