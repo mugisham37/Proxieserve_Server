@@ -73,3 +73,22 @@ class MessagesRepository:
             )
         )
         return int(result or 0)
+
+    async def count_unread_agent_messages_for_client(self, client_id: str) -> int:
+        from sqlalchemy import func
+
+        from app.modules.applications.models import Application
+
+        result = await self.session.scalar(
+            select(func.count())
+            .select_from(ApplicationMessage)
+            .join(Application, Application.application_id == ApplicationMessage.application_id)
+            .where(
+                Application.client_id == client_id,
+                ApplicationMessage.is_internal.is_(False),
+                ApplicationMessage.is_system.is_(False),
+                ApplicationMessage.sender_role == "staff:agent",
+                ApplicationMessage.is_read_by_client.is_(False),
+            )
+        )
+        return int(result or 0)
