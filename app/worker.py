@@ -10,6 +10,9 @@ from app.core.email import SmtpEmailNotifier
 from app.core.logging import get_logger
 from app.core.notifier import EmailNotification, SmsNotification, StubNotifier
 from app.modules.documents.jobs import document_qc_job
+from app.modules.assignments.jobs import auto_assign_application_job
+from app.modules.broadcasts.jobs import broadcast_send_job
+from app.modules.payments.jobs import payment_card_confirm_job, payment_timeout_job
 
 logger = get_logger("worker")
 
@@ -37,7 +40,15 @@ async def send_sms_job(ctx: dict[str, object], *, to: str, body: str) -> None:
 
 
 class WorkerSettings:
-    functions = [send_email_job, send_sms_job, document_qc_job]
+    functions = [
+        send_email_job,
+        send_sms_job,
+        document_qc_job,
+        auto_assign_application_job,
+        payment_timeout_job,
+        payment_card_confirm_job,
+        broadcast_send_job,
+    ]
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
 
 
