@@ -18,9 +18,13 @@ from app.core.exceptions import (
 from app.core.jobs import JobQueueManager
 from app.core.security import generate_id
 from app.modules.applications.constants import (
+    ACTIVE_STATUSES,
     CLIENT_CANCELLABLE,
     SYSTEM_MESSAGES,
     VALID_STATUS_TRANSITIONS,
+    compute_sla_deadline,
+    compute_sla_state,
+    status_display,
 )
 from app.modules.applications.models import Application
 from app.modules.applications.repository import ApplicationsRepository
@@ -28,12 +32,13 @@ from app.modules.applications.schemas import (
     AdminApplicationListResponse,
     AgentCaseListResponse,
     AgentCaseSummary,
-    AnalyticsResponse,
     ApplicationDetailResponse,
     ApplicationListResponse,
     ApplicationLookupData,
     ApplicationSummaryResponse,
     CancelApplicationRequest,
+    DashboardSummaryResponse,
+    PaymentInfoResponse,
     StatusHistoryResponse,
     SubmitApplicationRequest,
     SubmitApplicationResponse,
@@ -83,6 +88,7 @@ class ApplicationsService:
         self._validate_service_data(service.form_fields, payload.service_data)
         code = await self._generate_unique_code()
         now = datetime.now(UTC)
+        sla_deadline = compute_sla_deadline(now, tier.eta_business_days)
         app = await self.repo.create_application(
             application_id=generate_id("app"),
             code=code,
@@ -98,6 +104,7 @@ class ApplicationsService:
             payment_amount=tier.platform_fee + tier.government_fee,
             submission_ip=submission_ip,
             submitted_at=now,
+            sla_deadline=sla_deadline,
         )
         await self.repo.add_status_history(
             id=generate_id("ash"),
@@ -113,6 +120,10 @@ class ApplicationsService:
         )
         await self.session.commit()
         if self.job_queue:
+            await self.job_queue.enqueue(
+                "auto_assign_application_job",
+                application_id=app.application_id,
+            )
             client = await self.auth_repo.get_user_by_id(client_id)
             if client and client.email:
                 await self.job_queue.enqueue(
@@ -222,7 +233,8 @@ class ApplicationsService:
                     status=app.status,
                     tier=app.tier,
                     submitted_at=app.submitted_at,
-                    sla_state=self._sla_state(app),
+                    sla_state=compute_sla_state(app),
+                    sla_deadline=app.sla_deadline,
                     unread_messages=unread,
                 )
             )
@@ -309,6 +321,37 @@ class ApplicationsService:
             status=app.status,
         )
 
+    async def get_dashboard_summary(self, client_id: str) -> DashboardSummaryResponse:
+        apps = await self.repo.list_by_client(client_id)
+        active_count = sum(1 for a in apps if a.status in ACTIVE_STATUSES)
+        completed_count = sum(1 for a in apps if a.status == "completed")
+        action_count = sum(1 for a in apps if a.status == "awaiting_client")
+        doc_count = 0
+        doc_size = 0
+        for app in apps:
+            if app.status in ACTIVE_STATUSES:
+                docs = await self.docs_repo.list_by_application(app.application_id)
+                doc_count += len(docs)
+                doc_size += sum(getattr(d, "file_size_bytes", 0) or 0 for d in docs)
+        completed = [a for a in apps if a.status == "completed" and a.completed_at]
+        avg_turnaround = None
+        if completed:
+            avg_turnaround = round(
+                sum((a.completed_at - a.submitted_at).total_seconds() / 86400 for a in completed)
+                / len(completed),
+                1,
+            )
+        unread = await self.messages_repo.count_unread_agent_messages_for_client(client_id)
+        return DashboardSummaryResponse(
+            unreadCount=unread,
+            actionCount=action_count,
+            activeCount=active_count,
+            completedCount=completed_count,
+            docCount=doc_count,
+            docSizeMB=round(doc_size / (1024 * 1024), 2),
+            avgTurnaround=avg_turnaround,
+        )
+
     async def claim(self, *, code: str, phone: str, client_id: str) -> None:
         app = await self.repo.get_by_code(code)
         if app is None:
@@ -319,25 +362,6 @@ class ApplicationsService:
         if app.client_id != client_id:
             app.client_id = client_id
             await self.session.commit()
-
-    async def get_analytics(self) -> AnalyticsResponse:
-        by_status = await self.repo.count_by_status()
-        by_service_raw = await self.repo.count_by_service()
-        by_service = [
-            {"service_name": name, "service_id": sid, "count": count}
-            for name, sid, count in by_service_raw
-        ]
-        total = sum(by_status.values())
-        completed = by_status.get("completed", 0)
-        sla_rate = (completed / total * 100) if total else 0.0
-        pending_payment = by_status.get("received", 0)
-        return AnalyticsResponse(
-            by_status=by_status,
-            by_service=by_service,
-            total_applications=total,
-            sla_compliance_rate=round(sla_rate, 2),
-            payment_pending_count=pending_payment,
-        )
 
     async def _apply_status_change(
         self,
@@ -397,6 +421,9 @@ class ApplicationsService:
             service_data=app.service_data,
             payment_status=app.payment_status,
             payment_amount=app.payment_amount,
+            status_display=status_display(app.status),
+            payment_info=await self._payment_info(app.application_id),
+            sla_deadline=app.sla_deadline,
             submitted_at=app.submitted_at,
             assigned_agent_id=app.assigned_agent_id,
             status_history=[
@@ -448,15 +475,34 @@ class ApplicationsService:
             payment_status=app.payment_status,
         )
 
+    async def _payment_info(self, application_id: str) -> PaymentInfoResponse | None:
+        from app.modules.payments.models import Payment
+        from sqlalchemy import select
+
+        payment = await self.session.scalar(
+            select(Payment)
+            .where(Payment.application_id == application_id, Payment.status == "paid")
+            .order_by(Payment.created_at.desc())
+            .limit(1)
+        )
+        if payment is None:
+            return None
+        from app.modules.payments.service import METHOD_LABELS
+
+        method = METHOD_LABELS.get(payment.method, payment.method)
+        if payment.card_brand:
+            method = f"{payment.card_brand.title()} Card"
+        return PaymentInfoResponse(
+            method=method,
+            amount=payment.amount_rwf,
+            governmentFee=payment.government_fee_rwf,
+            vatRate=float(payment.vat_rate),
+            paidAt=payment.paid_at,
+            receiptNumber=payment.receipt_number,
+        )
+
     def _sla_state(self, app: Application) -> str:
-        if app.status in {"completed", "rejected", "cancelled"}:
-            return "ok"
-        days = (datetime.now(UTC) - app.submitted_at).days
-        if days > 14:
-            return "over"
-        if days > 10:
-            return "warn"
-        return "ok"
+        return compute_sla_state(app)
 
     async def _send_status_email(self, app: Application, status: str) -> None:
         if not self.job_queue:
