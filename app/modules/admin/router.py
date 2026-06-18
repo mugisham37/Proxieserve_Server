@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +20,7 @@ from app.modules.admin.schemas import (
     UpdateAgentResponse,
 )
 from app.modules.admin.service import AdminService
-from app.modules.auth.dependencies import REQUIRE_ADMIN
+from app.modules.auth.dependencies import REQUIRE_ADMIN, require_access_payload
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -81,7 +81,14 @@ async def get_agent(
 async def update_agent(
     agent_id: str,
     payload: UpdateAgentRequest,
+    request: Request,
+    token: dict[str, object] = Depends(require_access_payload),
     service: AdminService = Depends(_get_admin_service),
 ) -> ApiResponse[UpdateAgentResponse]:
-    data = await service.update_agent(agent_id, payload)
+    data = await service.update_agent(
+        agent_id,
+        payload,
+        admin_id=str(token["user_id"]),
+        ip_address=request.client.host if request.client else None,
+    )
     return success_response(message="Agent updated.", data=data)

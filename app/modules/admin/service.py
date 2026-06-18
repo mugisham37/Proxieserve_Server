@@ -21,6 +21,7 @@ from app.modules.admin.schemas import (
     UpdateAgentRequest,
     UpdateAgentResponse,
 )
+from app.modules.audit.service import write_audit_entry
 from app.modules.auth.models import StaffProfile, User
 
 
@@ -139,7 +140,14 @@ class AdminService:
             created_at=user.created_at.isoformat(),
         )
 
-    async def update_agent(self, agent_id: str, request: UpdateAgentRequest) -> UpdateAgentResponse:
+    async def update_agent(
+        self,
+        agent_id: str,
+        request: UpdateAgentRequest,
+        *,
+        admin_id: str | None = None,
+        ip_address: str | None = None,
+    ) -> UpdateAgentResponse:
         result = await self.session.execute(
             select(User, StaffProfile)
             .join(StaffProfile, StaffProfile.user_id == User.user_id)
@@ -179,6 +187,19 @@ class AdminService:
             profile.totp_secret_encrypted = None
             profile.twofa_enabled = True
             updated.append("2fa_reset")
+
+        if updated and admin_id:
+            await write_audit_entry(
+                self.session,
+                actor_id=admin_id,
+                actor_role="staff:admin",
+                action="agent.updated",
+                resource_type="agent",
+                resource_id=agent_id,
+                details={"updated": updated},
+                ip_address=ip_address,
+                kind="Privileged",
+            )
 
         await self.session.commit()
         return UpdateAgentResponse(agent_id=agent_id, updated=updated)
