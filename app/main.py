@@ -21,7 +21,7 @@ from app.core.redis import redis_manager
 from app.core.security import generate_id
 from app.modules.auth.models import StaffProfile, User
 from app.modules.auth.router import router as auth_router
-from app.seed import seed_dev_services
+from app.seed import seed_dev_services, seed_platform_settings
 
 _logger = logging.getLogger(__name__)
 
@@ -86,6 +86,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     os.makedirs(settings.upload_dir, exist_ok=True)
     await _seed_admin()
     await seed_dev_services()
+    await seed_platform_settings()
     yield
     await job_queue_manager.close()
     await redis_manager.close()
@@ -143,7 +144,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app.modules.applications.router import (
         legacy_router as applications_legacy_router,
     )
-    from app.modules.assignments.router import router as assignments_router
+    from app.modules.assignments.router import admin_router as assignments_admin_router
+    from app.modules.assignments.router import agent_router as assignments_agent_router
+    from app.modules.audit.router import router as audit_router
+    from app.modules.broadcasts.router import router as broadcasts_router
     from app.modules.documents.router import (
         agent_router as documents_agent_router,
     )
@@ -162,10 +166,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app.modules.messages.router import (
         client_router as messages_client_router,
     )
+    from app.modules.oversight.router import router as oversight_router
+    from app.modules.payments.router import router as payments_router
+    from app.modules.platform.router import router as platform_router
     from app.modules.services.router import admin_router as services_admin_router
     from app.modules.services.router import public_router as services_public_router
 
     app.include_router(auth_router)
+    app.include_router(platform_router)
     app.include_router(services_public_router)
     app.include_router(services_admin_router)
     app.include_router(applications_client_router)
@@ -173,13 +181,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(documents_client_router)
     app.include_router(messages_client_router)
     app.include_router(tracker_router)
+    app.include_router(payments_router)
     app.include_router(applications_agent_router)
     app.include_router(documents_agent_router)
     app.include_router(messages_agent_router)
-    app.include_router(assignments_router)
+    app.include_router(assignments_agent_router)
     app.include_router(applications_admin_router)
     app.include_router(messages_admin_router)
     app.include_router(analytics_router)
+    app.include_router(oversight_router)
+    app.include_router(audit_router)
+    app.include_router(broadcasts_router)
+    app.include_router(assignments_admin_router)
     app.include_router(documents_download_router)
     app.include_router(admin_router)
 
