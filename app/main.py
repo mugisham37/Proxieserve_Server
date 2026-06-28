@@ -21,7 +21,7 @@ from app.core.redis import redis_manager
 from app.core.security import generate_id
 from app.modules.auth.models import StaffProfile, User
 from app.modules.auth.router import router as auth_router
-from app.seed import seed_dev_services, seed_platform_settings
+from app.seed import seed_platform_settings
 
 _logger = logging.getLogger(__name__)
 
@@ -85,7 +85,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     os.makedirs(settings.upload_dir, exist_ok=True)
     await _seed_admin()
-    await seed_dev_services()
     await seed_platform_settings()
     yield
     await job_queue_manager.close()
