@@ -1,4 +1,4 @@
-.PHONY: dev server worker test lint fmt migrate
+.PHONY: dev server worker test lint fmt migrate seed
 
 dev:
 	@echo "Starting API server + ARQ worker..."
@@ -15,6 +15,9 @@ worker:
 
 migrate:
 	.venv/bin/alembic upgrade head
+
+seed:
+	.venv/bin/python scripts/seed.py
 
 test:
 	.venv/bin/pytest
