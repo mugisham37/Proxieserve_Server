@@ -52,6 +52,15 @@ class AccountExistsError(AppError):
         )
 
 
+class IdentifierReservedError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message="This email is reserved for staff access. Use the staff sign-in portal instead.",
+            error_type="identifier-reserved",
+            status_code=409,
+        )
+
+
 class OtpWrongError(AppError):
     def __init__(self, *, attempts_remaining: int) -> None:
         super().__init__(
