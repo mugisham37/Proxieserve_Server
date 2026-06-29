@@ -50,6 +50,9 @@ class PlatformService:
             row.ip_allowlist = data["ipAllowlist"]
         if "maintenanceMode" in data:
             row.maintenance_mode = data["maintenanceMode"]
+            from app.core.middleware import invalidate_maintenance_mode_cache_async
+
+            await invalidate_maintenance_mode_cache_async()
         row.updated_by = admin_id
         row.updated_at = datetime.now(UTC)
         after = self._to_response(row)
