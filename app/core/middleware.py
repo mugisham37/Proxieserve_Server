@@ -21,7 +21,26 @@ from app.core.redis import redis_manager
 _SENSITIVE_FIELDS = frozenset(
     {"password", "new_password", "confirm_password", "token", "otp", "code", "secret", "refresh_token"}
 )
-_SKIP_HEADER_NAMES = frozenset({"authorization", "cookie", "x-forwarded-for", "host"})
+
+_MAINTENANCE_EXEMPT_PATHS = frozenset({"/health", "/ready", "/metrics", "/"})
+_MAINTENANCE_REDIS_KEY = "platform:maintenance_mode"
+_MAINTENANCE_REDIS_TTL_SECONDS = 60
+_MAINTENANCE_MEMORY_TTL_SECONDS = 60.0
+
+_maintenance_memory_cache: tuple[bool, float] | None = None
+
+
+def invalidate_maintenance_mode_cache() -> None:
+    """Clear in-process maintenance cache after admin settings change."""
+    global _maintenance_memory_cache
+    _maintenance_memory_cache = None
+
+
+async def invalidate_maintenance_mode_cache_async() -> None:
+    """Clear in-process and Redis maintenance cache after admin settings change."""
+    invalidate_maintenance_mode_cache()
+    if redis_manager.client is not None:
+        await redis_manager.client.delete(_MAINTENANCE_REDIS_KEY)
 
 
 def _sanitize_body(raw: bytes) -> dict | None:
@@ -36,8 +55,12 @@ def _sanitize_body(raw: bytes) -> dict | None:
     return {k: "***" if k in _SENSITIVE_FIELDS else v for k, v in parsed.items()}
 
 
-def _filter_headers(headers: dict[str, str]) -> dict[str, str]:
-    return {k: v for k, v in headers.items() if k.lower() not in _SKIP_HEADER_NAMES}
+def _should_check_maintenance(request: Request) -> bool:
+    if request.method == "OPTIONS":
+        return False
+    if request.url.path.startswith("/api/admin"):
+        return False
+    return request.url.path not in _MAINTENANCE_EXEMPT_PATHS
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -86,16 +109,12 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
         request.state.request_id = request_id
         structlog.contextvars.bind_contextvars(request_id=request_id)
 
-        # Read and cache body before handing off to the route handler.
-        # Starlette caches it in request._body so downstream reads work normally.
-        body_bytes = await request.body()
+        body_bytes = b""
+        if request.method in {"POST", "PUT", "PATCH"}:
+            # Cache body before the route handler so error logging can sanitize it.
+            body_bytes = await request.body()
 
-        if not request.url.path.startswith("/api/admin") and request.url.path not in {
-            "/health",
-            "/ready",
-            "/metrics",
-            "/",
-        }:
+        if _should_check_maintenance(request):
             maintenance = await _get_maintenance_mode()
             if maintenance:
                 return JSONResponse(
@@ -119,14 +138,13 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
             "path": request.url.path,
             "status_code": response.status_code,
             "duration_ms": round(duration_ms, 2),
-            "headers": _filter_headers(dict(request.headers)),
         }
 
         query = str(request.url.query)
         if query:
             log_kwargs["query"] = query
 
-        if request.method in {"POST", "PUT", "PATCH"} and body_bytes:
+        if response.status_code >= 400 and request.method in {"POST", "PUT", "PATCH"} and body_bytes:
             sanitized = _sanitize_body(body_bytes)
             if sanitized is not None:
                 log_kwargs["body"] = sanitized
