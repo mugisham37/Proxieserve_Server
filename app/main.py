@@ -80,7 +80,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging(settings.app_log_level)
     db_manager.configure(settings)
     redis_manager.configure(settings)
-    await job_queue_manager.configure(settings)
+    try:
+        await job_queue_manager.configure(settings)
+    except Exception as exc:
+        _logger.warning("Redis unavailable at startup — background jobs disabled: %s", exc)
     import os
 
     os.makedirs(settings.upload_dir, exist_ok=True)
