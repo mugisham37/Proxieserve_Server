@@ -7,7 +7,7 @@ from opentelemetry import trace
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from prometheus_client import make_asgi_app
 
 from app.core.config import Settings
@@ -28,10 +28,7 @@ def configure_observability(app: FastAPI, settings: Settings) -> None:
         provider.add_span_processor(
             BatchSpanProcessor(OTLPSpanExporter(endpoint=settings.otel_endpoint))
         )
-    elif not settings.is_production:
-        # ConsoleSpanExporter is helpful during development but too verbose in production.
-        provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
-    # In production without an OTLP endpoint, the provider has no span processor (no-op).
+    # Without an OTLP endpoint the provider has no span processor (no-op).
 
     trace.set_tracer_provider(provider)
     FastAPIInstrumentor.instrument_app(app)
