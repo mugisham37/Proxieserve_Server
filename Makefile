@@ -2,13 +2,19 @@
 
 dev:
 	@echo "Starting API server + ARQ worker..."
-	@trap 'kill 0' INT; \
-	  .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload & \
-	  .venv/bin/python -m app.worker & \
+	@trap 'kill 0' INT TERM; \
+	  .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 \
+	    --reload --reload-dir app \
+	    --reload-exclude '*.pyc' --reload-exclude '__pycache__' & \
+	  (while true; do \
+	    .venv/bin/python -m app.worker; \
+	    echo "ARQ worker exited — restarting in 3s..."; \
+	    sleep 3; \
+	  done) & \
 	  wait
 
 server:
-	.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+	.venv/bin/python scripts/run_server.py
 
 worker:
 	.venv/bin/python -m app.worker
