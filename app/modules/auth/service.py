@@ -16,6 +16,7 @@ from app.core.events import EventBus
 from app.core.exceptions import (
     AccountExistsError,
     AccountLockedError,
+    IdentifierReservedError,
     InvalidCredentialsError,
     OtpWrongError,
     ResetExpiredError,
@@ -99,6 +100,8 @@ class AuthService:
             identifier=normalized_identifier,
         )
         if existing is not None:
+            if existing.role.startswith("staff:"):
+                raise IdentifierReservedError()
             raise AccountExistsError()
 
         user_id = generate_id("usr")
