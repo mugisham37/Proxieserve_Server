@@ -159,13 +159,24 @@ def configure_middleware(app: FastAPI, settings: Settings) -> None:
 
 
 async def _get_maintenance_mode() -> bool:
-    cache_key = "platform:maintenance_mode"
+    global _maintenance_memory_cache
+
+    now = time.monotonic()
+    if _maintenance_memory_cache is not None:
+        cached_value, cached_at = _maintenance_memory_cache
+        if now - cached_at < _MAINTENANCE_MEMORY_TTL_SECONDS:
+            return cached_value
+
     if redis_manager.client is not None:
-        cached = await redis_manager.client.get(cache_key)
+        cached = await redis_manager.client.get(_MAINTENANCE_REDIS_KEY)
         if cached is not None:
-            return cached == b"1"
+            value = cached == "1"
+            _maintenance_memory_cache = (value, now)
+            return value
+
     if db_manager.session_factory is None:
         return False
+
     from app.modules.platform.repository import PlatformRepository
 
     async with db_manager.session_factory() as session:
@@ -173,6 +184,13 @@ async def _get_maintenance_mode() -> bool:
         settings = await repo.get_or_create()
         value = settings.maintenance_mode
         await session.commit()
+
     if redis_manager.client is not None:
-        await redis_manager.client.setex(cache_key, 5, "1" if value else "0")
+        await redis_manager.client.setex(
+            _MAINTENANCE_REDIS_KEY,
+            _MAINTENANCE_REDIS_TTL_SECONDS,
+            "1" if value else "0",
+        )
+
+    _maintenance_memory_cache = (value, now)
     return value
