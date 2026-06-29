@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.core.config import get_settings
 from app.core.logging import get_logger
 
 
@@ -27,11 +28,18 @@ class StubNotifier:
         self.logger = get_logger("notifier")
 
     async def send_email(self, notification: EmailNotification) -> None:
-        self.logger.info(
-            "send_email_stub",
-            to=notification.to,
-            subject=notification.subject,
-        )
+        log_kwargs: dict[str, str] = {
+            "to": notification.to,
+            "subject": notification.subject,
+        }
+        settings = get_settings()
+        if settings.app_env == "development":
+            log_kwargs["body_preview"] = notification.body[:500]
+        self.logger.info("send_email_stub", **log_kwargs)
 
     async def send_sms(self, notification: SmsNotification) -> None:
-        self.logger.info("send_sms_stub", to=notification.to)
+        log_kwargs: dict[str, str] = {"to": notification.to}
+        settings = get_settings()
+        if settings.app_env == "development":
+            log_kwargs["body"] = notification.body
+        self.logger.info("send_sms_stub", **log_kwargs)
